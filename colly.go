@@ -77,6 +77,8 @@ type Collector struct {
 	// Leave it blank to allow any URLs to be visited
 	URLFilters []*regexp.Regexp
 
+	// AllowURLCheck allows URL check using http 'HEAD' method
+	AllowURLCheck bool
 	// AllowURLRevisit allows multiple downloads of the same URL
 	AllowURLRevisit bool
 	// MaxBodySize is the limit of the retrieved response body in bytes.
@@ -308,6 +310,13 @@ func AllowURLRevisit() func(*Collector) {
 	}
 }
 
+// AllowURLCheck instructs the Collector to allow URL check using http 'HEAD' method
+func AllowURLCheck() func(*Collector) {
+	return func(c *Collector) {
+		c.AllowURLCheck = true
+	}
+}
+
 // MaxBodySize sets the limit of the retrieved response body in bytes.
 func MaxBodySize(sizeInBytes int) func(*Collector) {
 	return func(c *Collector) {
@@ -403,15 +412,12 @@ func (c *Collector) Appengine(ctx context.Context) {
 // request to the URL specified in parameter.
 // Visit also calls the previously provided callbacks
 func (c *Collector) Visit(URL string) error {
-	if check := c.scrape(URL, "HEAD", 1, nil, nil, nil, true); check != nil {
-		return check
+	if c.AllowURLCheck {
+		if err := c.scrape(URL, "HEAD", 1, nil, nil, nil, true); err != nil {
+			return err
+		}
 	}
 	return c.scrape(URL, "GET", 1, nil, nil, nil, true)
-}
-
-// Head starts a collector job by creating a HEAD request.
-func (c *Collector) Head(URL string) error {
-	return c.scrape(URL, "HEAD", 1, nil, nil, nil, false)
 }
 
 // Post starts a collector job by creating a POST request.
@@ -1105,6 +1111,7 @@ func (c *Collector) Clone() *Collector {
 	return &Collector{
 		AllowedDomains:         c.AllowedDomains,
 		AllowURLRevisit:        c.AllowURLRevisit,
+		AllowURLCheck:          c.AllowURLCheck,
 		CacheDir:               c.CacheDir,
 		DetectCharset:          c.DetectCharset,
 		DisallowedDomains:      c.DisallowedDomains,
